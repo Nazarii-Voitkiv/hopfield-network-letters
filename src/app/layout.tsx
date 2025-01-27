@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import { ToastProvider } from '@/components/Toast'
+import FacebookPixel from '@/components/FacebookPixel' 
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
@@ -18,6 +19,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="uk">
+      <head>
+        <FacebookPixel />
+      </head>
       <body className={inter.className}>
         <ToastProvider>
           <Navbar />

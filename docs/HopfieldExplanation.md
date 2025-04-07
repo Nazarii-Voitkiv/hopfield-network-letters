@@ -10,13 +10,14 @@
 - Wartości pikseli: 1 (czarny/aktywny) lub -1 (biały/nieaktywny)
 - Wzorce przechowywane w `Map<String, List<int[]>> wzorce`
 
-## 3. Uczenie sieci (metoda `train()`)
+## 3. Uczenie sieci (metoda `trenuj()`)
+
 ```java
 private void zastosujReguleHebbianowska(int[][] wzorce) {
     for (int[] wzorzec : wzorce) {
         for (int i = 0; i < rozmiar; i++) {
             for (int j = 0; j < rozmiar; j++) {
-                if (i != j) { // Brak połączeń z samym sobą
+                if (i != j) {
                     wagi[i][j] += (double)(wzorzec[i] * wzorzec[j]) / wzorce.length;
                 }
             }
@@ -25,28 +26,25 @@ private void zastosujReguleHebbianowska(int[][] wzorce) {
 }
 ```
 
-## 4. Rozpoznawanie wzorca (metoda `recall()`)
+## 4. Rozpoznawanie wzorca (metoda `rozpoznaj()`)
+
 ```java
-public int[] recall(int[] wejscie, int maxIteracje) {
+public int[] rozpoznaj(int[] wejscie, int maksIteracje) {
     int[] stan = wejscie.clone();
     
-    while (iteracje < maxIteracje) {
-        // Dla każdego neuronu
+    while (iteracje < maksIteracje) {
         for (int i = 0; i < rozmiar; i++) {
             double suma = 0.0;
-            // Suma ważona wejść
             for (int j = 0; j < rozmiar; j++) {
                 if (i != j) {
                     suma += wagi[i][j] * stan[j];
                 }
             }
-            // Funkcja aktywacji
             int nowaWartosc = (suma >= 0) ? 1 : -1;
             stan[i] = nowaWartosc;
         }
         
-        // Sprawdzenie stabilności stanu
-        if (!zmieniono || energia_wzrosła) break;
+        if (!zmieniono || energia_wzrosla) break;
     }
     
     return stan;
@@ -59,12 +57,6 @@ public int[] recall(int[] wejscie, int maxIteracje) {
 - Sortowanie wyników według najmniejszej odległości
 
 ## 6. Interpretacja wyniku
-- Wyświetlenie rozpoznanej litery tylko gdy:
-  - dystans ≤ 5 i zmienione piksele ≤ 10 → ✅ "Rozpoznano"
-  - w przeciwnym wypadku → ⚠️ "Niepewne rozpoznanie"
+- Wyświetlenie rozpoznanej litery
 - Pokazanie dystansów Hamminga dla wszystkich liter
 - Informacja o liczbie zmienionych pikseli
-
-## Przykłady wyjścia:
-
-### Rozpoznanie pewne:

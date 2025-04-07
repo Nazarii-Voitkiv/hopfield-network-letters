@@ -1,18 +1,22 @@
 public class HopfieldNetwork {
-    private int rozmiar;
-    private double[][] wagi;
+    private final int rozmiar;
+    private final double[][] wagi;
     
     public HopfieldNetwork(int rozmiar) {
         this.rozmiar = rozmiar;
         this.wagi = new double[rozmiar][rozmiar];
     }
     
-    public void train(int[][] wzorce) {
-        resetWagi();
+    public void trenuj(int[][] wzorce) {
+        if (wzorce == null || wzorce.length == 0) {
+            throw new IllegalArgumentException("Brak wzorców do treningu");
+        }
+        
+        zresetujWagi(); // Upewnij się, że wagi są zresetowane przed każdym treningiem
         zastosujReguleHebbianowska(wzorce);
     }
     
-    private void resetWagi() {
+    private void zresetujWagi() {
         for (int i = 0; i < rozmiar; i++) {
             for (int j = 0; j < rozmiar; j++) {
                 wagi[i][j] = 0.0;
@@ -23,7 +27,7 @@ public class HopfieldNetwork {
     private void zastosujReguleHebbianowska(int[][] wzorce) {
         for (int[] wzorzec : wzorce) {
             for (int i = 0; i < rozmiar; i++) {
-                for (int j = 0; j < rozmiar; j++) {
+                for (int j = 0; i < rozmiar; j++) {
                     if (i != j) {
                         wagi[i][j] += (double)(wzorzec[i] * wzorzec[j]) / wzorce.length;
                     }
@@ -32,49 +36,49 @@ public class HopfieldNetwork {
         }
     }
     
-    public int[] recall(int[] wejscie, int maxIteracje) {
+    public int[] rozpoznaj(int[] wejscie) {
+        return rozpoznaj(wejscie, 20);
+    }
+    
+    public int[] rozpoznaj(int[] wejscie, int maksIteracji) {
         int[] stan = wejscie.clone();
         boolean zmieniono;
         int iteracje = 0;
         double poprzedniaEnergia = obliczEnergie(stan);
         
-        while (iteracje < maxIteracje) {
-            zmieniono = false;
+        while (iteracje < maksIteracji) {
+            zmieniono = aktualizujStanSieci(stan);
             
-            for (int i = 0; i < rozmiar; i++) {
-                double suma = 0.0;
-                for (int j = 0; j < rozmiar; j++) {
-                    if (i != j) {
-                        suma += wagi[i][j] * stan[j];
-                    }
-                }
-                
-                int nowaWartosc = (suma > 0.0) ? 1 : -1;
-                
-                if (stan[i] != nowaWartosc) {
-                    stan[i] = nowaWartosc;
-                    zmieniono = true;
-                }
-            }
+            double aktualna_energia = obliczEnergie(stan);
             
-            double obecnaEnergia = obliczEnergie(stan);
-            
-            if (!zmieniono || obecnaEnergia >= poprzedniaEnergia) {
+            if (!zmieniono || aktualna_energia >= poprzedniaEnergia) {
                 break;
             }
             
-            poprzedniaEnergia = obecnaEnergia;
+            poprzedniaEnergia = aktualna_energia;
             iteracje++;
         }
         
         return stan;
     }
     
-    public int[] recall(int[] wejscie) {
-        return recall(wejscie, 20);
+    private boolean aktualizujStanSieci(int[] stan) {
+        boolean zmieniono = false;
+        
+        for (int i = 0; i < rozmiar; i++) {
+            double aktywacja = obliczAktywacje(stan, i);
+            int nowaWartosc = (aktywacja > 0.0) ? 1 : -1;
+            
+            if (stan[i] != nowaWartosc) {
+                stan[i] = nowaWartosc;
+                zmieniono = true;
+            }
+        }
+        
+        return zmieniono;
     }
     
-    public int hammingDistance(int[] a, int[] b) {
+    public int odlegloscHamminga(int[] a, int[] b) {
         if (a.length != b.length) {
             throw new IllegalArgumentException("Wektory muszą mieć tę samą długość");
         }
@@ -93,7 +97,7 @@ public class HopfieldNetwork {
         double energia = 0.0;
         
         for (int i = 0; i < rozmiar; i++) {
-            for (int j = 0; j < rozmiar; j++) {
+            for (int j = 0; j < rozmiar; j++) { // Poprawka błędu w pętli - było "j < i"
                 if (i != j) {
                     energia -= wagi[i][j] * stan[i] * stan[j] * 0.5;
                 }
@@ -101,5 +105,50 @@ public class HopfieldNetwork {
         }
         
         return energia;
+    }
+    
+    public boolean aktualizujNeuron(int[] stan, int indeks, int[] oryginalneWejscie) {
+        sprawdzIndeks(indeks);
+        
+        if (oryginalneWejscie[indeks] == 1) {
+            return false;
+        }
+        
+        double aktywacja = obliczAktywacje(stan, indeks);
+        int poprzedniStan = stan[indeks];
+        stan[indeks] = (aktywacja > 0.0) ? 1 : -1;
+        
+        return stan[indeks] != poprzedniStan;
+    }
+    
+    private void sprawdzIndeks(int indeks) {
+        if (indeks < 0 || indeks >= rozmiar) {
+            throw new IllegalArgumentException("Indeks poza zakresem: " + indeks);
+        }
+    }
+    
+    public double obliczAktywacje(int[] stan, int indeks) {
+        sprawdzIndeks(indeks);
+        
+        return java.util.stream.IntStream.range(0, rozmiar)
+            .filter(j -> j != indeks)
+            .mapToDouble(j -> wagi[indeks][j] * stan[j])
+            .sum();
+    }
+    
+    public boolean czyStan_stabilny(int[] stan, int[] oryginalneWejscie) {
+        for (int i = 0; i < rozmiar; i++) {
+            if (oryginalneWejscie[i] == 1) {
+                continue;
+            }
+            
+            double aktywacja = obliczAktywacje(stan, i);
+            int nowaWartosc = (aktywacja > 0.0) ? 1 : -1;
+            
+            if (stan[i] != nowaWartosc) {
+                return false;
+            }
+        }
+        return true;
     }
 }

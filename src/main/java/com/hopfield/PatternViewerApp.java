@@ -8,194 +8,193 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class PatternViewerApp extends JFrame {
-    private JComboBox<String> wybórLitery;
-    private JComboBox<String> wybórWzorca;
-    private PatternPanel panelWzorca;
-    private JButton przyciskUsun;
+public class PatternViewerApp extends JDialog { // Zmiana z JFrame na JDialog dla modalności
+    private static final String[] OPCJE_LITER = {"M", "O", "N"};
+    private static final int ROZMIAR_SIATKI = 8;
+    private static final int ROZMIAR_KOMORKI = 40;
+    
+    private JComboBox<String> wybierakLiter;
+    private JComboBox<String> wybierakWzorcow;
+    private PanelWzorca panelWzorca;
+    private JButton przyciskUsuwania;
     private JLabel etykietaStatusu;
-    private Map<String, List<Path>> plikiWzorców;
+    private Map<String, List<Path>> plikiWzorcow;
     
     public PatternViewerApp() {
-        setTitle("Przeglądarka Wzorców");
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        super((Frame)null, "Przeglądarka wzorców", true); // Jawnie ustawiamy jako modalny dialog
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE); // Zmiana z JFrame na JDialog
         setLayout(new BorderLayout(10, 10));
         
         inicjalizujKomponenty();
-        stwórzUI();
+        utworzInterfejs();
         
         setSize(400, 550);
         setLocationRelativeTo(null);
     }
     
     private void inicjalizujKomponenty() {
-        panelWzorca = new PatternPanel();
+        panelWzorca = new PanelWzorca();
         etykietaStatusu = new JLabel("Wybierz literę i wzorzec do wyświetlenia");
-        inicjalizujPlikiWzorcow();
+        wczytajPlikiWzorcow();
     }
     
-    private void stwórzUI() {
-        add(stwórzPanelWyboru(), BorderLayout.NORTH);
-        add(stwórzKontenerWzorca(), BorderLayout.CENTER);
-        add(stwórzPanelStatusu(), BorderLayout.SOUTH);
+    private void utworzInterfejs() {
+        add(utworzPanelWyboru(), BorderLayout.NORTH);
+        add(utworzKontenerWzorca(), BorderLayout.CENTER);
+        add(utworzPanelStatusu(), BorderLayout.SOUTH);
         
-        aktualizujWybórWzorca();
+        aktualizujWybierakWzorcow();
     }
     
-    private JPanel stwórzPanelWyboru() {
+    private JPanel utworzPanelWyboru() {
         JPanel panel = new JPanel(new GridLayout(3, 2, 5, 5));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        wybórLitery = new JComboBox<>(new String[]{"M", "O", "N"});
-        wybórLitery.addActionListener(e -> aktualizujWybórWzorca());
+        wybierakLiter = new JComboBox<>(OPCJE_LITER);
+        wybierakLiter.addActionListener(e -> aktualizujWybierakWzorcow());
         
-        wybórWzorca = new JComboBox<>();
-        wybórWzorca.addActionListener(e -> wyświetlWybranyWzorzec());
+        wybierakWzorcow = new JComboBox<>();
+        wybierakWzorcow.addActionListener(e -> wyswietlWybranyWzorzec());
         
-        przyciskUsun = new JButton("Usuń Wzorzec");
-        przyciskUsun.addActionListener(e -> usuńWybranyWzorzec());
-        przyciskUsun.setEnabled(false);
+        przyciskUsuwania = new JButton("Usuń wzorzec");
+        przyciskUsuwania.addActionListener(e -> usunWybranyWzorzec());
+        przyciskUsuwania.setEnabled(false);
         
         panel.add(new JLabel("Litera:"));
-        panel.add(wybórLitery);
+        panel.add(wybierakLiter);
         panel.add(new JLabel("Wzorzec:"));
-        panel.add(wybórWzorca);
+        panel.add(wybierakWzorcow);
         panel.add(new JLabel(""));
-        panel.add(przyciskUsun);
+        panel.add(przyciskUsuwania);
         
         return panel;
     }
     
-    private JPanel stwórzKontenerWzorca() {
+    private JPanel utworzKontenerWzorca() {
         JPanel kontener = new JPanel(new BorderLayout());
-        kontener.setBorder(BorderFactory.createTitledBorder("Widok Wzorca"));
+        kontener.setBorder(BorderFactory.createTitledBorder("Podgląd wzorca"));
         kontener.add(panelWzorca, BorderLayout.CENTER);
         return kontener;
     }
     
-    private JPanel stwórzPanelStatusu() {
+    private JPanel utworzPanelStatusu() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         panel.add(etykietaStatusu, BorderLayout.CENTER);
         return panel;
     }
     
-    private void inicjalizujPlikiWzorcow() {
-        plikiWzorców = new HashMap<>();
-        plikiWzorców.put("M", new ArrayList<>());
-        plikiWzorców.put("O", new ArrayList<>());
-        plikiWzorców.put("N", new ArrayList<>());
+    private void wczytajPlikiWzorcow() {
+        plikiWzorcow = new HashMap<>();
+        for (String litera : OPCJE_LITER) {
+            plikiWzorcow.put(litera, new ArrayList<>());
+        }
         
         try {
-            Path katalogWzorców = Paths.get(PatternUtils.PATTERNS_DIR);
-            if (Files.exists(katalogWzorców)) {
-                List<Path> wszystkiePliki = Files.list(katalogWzorców).collect(Collectors.toList());
+            Path katalogWzorcow = Paths.get(PatternUtils.KATALOG_WZORCOW);
+            if (Files.exists(katalogWzorcow)) {
+                List<Path> wszystkiePliki = Files.list(katalogWzorcow).collect(Collectors.toList());
                 
-                for (Path plik : wszystkiePliki) {
-                    String nazwaPliku = plik.getFileName().toString();
-                    for (String litera : plikiWzorców.keySet()) {
-                        if (nazwaPliku.startsWith(litera + "_") && nazwaPliku.endsWith(".pat")) {
-                            plikiWzorców.get(litera).add(plik);
-                        }
-                    }
-                }
-                
-                for (List<Path> pliki : plikiWzorców.values()) {
-                    pliki.sort((p1, p2) -> {
-                        int num1 = wyodrębnijNumerWzorca(p1.getFileName().toString());
-                        int num2 = wyodrębnijNumerWzorca(p2.getFileName().toString());
-                        return Integer.compare(num1, num2);
-                    });
+                for (String litera : OPCJE_LITER) {
+                    String prefiks = litera + "_";
+                    plikiWzorcow.put(litera, wszystkiePliki.stream()
+                        .filter(sciezka -> {
+                            String nazwaPliku = sciezka.getFileName().toString();
+                            return nazwaPliku.startsWith(prefiks) && nazwaPliku.endsWith(".pat");
+                        })
+                        .sorted((p1, p2) -> {
+                            int num1 = wyodrebnijNumerWzorca(p1.getFileName().toString());
+                            int num2 = wyodrebnijNumerWzorca(p2.getFileName().toString());
+                            return Integer.compare(num1, num2);
+                        })
+                        .collect(Collectors.toList()));
                 }
             }
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, 
-                "Błąd wczytywania plików wzorców: " + e.getMessage(),
+                "Błąd podczas wczytywania plików wzorców: " + e.getMessage(),
                 "Błąd", JOptionPane.ERROR_MESSAGE);
         }
     }
     
-    private int wyodrębnijNumerWzorca(String nazwaPliku) {
+    private int wyodrebnijNumerWzorca(String nazwaPliku) {
         try {
-            int pozycjaPodkreślnika = nazwaPliku.indexOf('_');
+            int pozycjaPodkreslenia = nazwaPliku.indexOf('_');
             int pozycjaKropki = nazwaPliku.lastIndexOf('.');
-            if (pozycjaPodkreślnika >= 0 && pozycjaKropki > pozycjaPodkreślnika) {
-                String częśćLiczbowa = nazwaPliku.substring(pozycjaPodkreślnika + 1, pozycjaKropki);
-                return Integer.parseInt(częśćLiczbowa);
+            if (pozycjaPodkreslenia >= 0 && pozycjaKropki > pozycjaPodkreslenia) {
+                String czescNumeryczna = nazwaPliku.substring(pozycjaPodkreslenia + 1, pozycjaKropki);
+                return Integer.parseInt(czescNumeryczna);
             }
         } catch (Exception e) {
-            // Ignoruj błędy parsowania
         }
         return 0;
     }
     
-    private void aktualizujWybórWzorca() {
-        String wybranaLitera = (String) wybórLitery.getSelectedItem();
-        List<Path> pliki = plikiWzorców.get(wybranaLitera);
+    private void aktualizujWybierakWzorcow() {
+        String wybranaLitera = (String) wybierakLiter.getSelectedItem();
+        List<Path> pliki = plikiWzorcow.get(wybranaLitera);
         
-        wybórWzorca.removeAllItems();
+        wybierakWzorcow.removeAllItems();
         
         if (pliki.isEmpty()) {
-            wybórWzorca.addItem("Brak dostępnych wzorców");
-            przyciskUsun.setEnabled(false);
-            panelWzorca.wyczyśćWzorzec();
+            wybierakWzorcow.addItem("Brak dostępnych wzorców");
+            przyciskUsuwania.setEnabled(false);
+            panelWzorca.wyczyscWzorzec();
             etykietaStatusu.setText("Nie znaleziono wzorców dla litery " + wybranaLitera);
         } else {
-            for (Path plik : pliki) {
-                wybórWzorca.addItem(plik.getFileName().toString());
-            }
-            przyciskUsun.setEnabled(true);
-            wyświetlWybranyWzorzec();
+            pliki.forEach(sciezka -> wybierakWzorcow.addItem(sciezka.getFileName().toString()));
+            przyciskUsuwania.setEnabled(true);
+            wyswietlWybranyWzorzec();
         }
     }
     
-    private void wyświetlWybranyWzorzec() {
-        if (wybórWzorca.getItemCount() == 0 || 
-            "Brak dostępnych wzorców".equals(wybórWzorca.getSelectedItem())) {
+    private void wyswietlWybranyWzorzec() {
+        if (wybierakWzorcow.getItemCount() == 0 || 
+            "Brak dostępnych wzorców".equals(wybierakWzorcow.getSelectedItem())) {
             return;
         }
         
-        String wybranaLitera = (String) wybórLitery.getSelectedItem();
-        int wybranyIndeks = wybórWzorca.getSelectedIndex();
+        String wybranaLitera = (String) wybierakLiter.getSelectedItem();
+        int wybranyIndeks = wybierakWzorcow.getSelectedIndex();
         
-        if (wybranyIndeks >= 0 && wybranyIndeks < plikiWzorców.get(wybranaLitera).size()) {
-            Path ścieżkaWzorca = plikiWzorców.get(wybranaLitera).get(wybranyIndeks);
+        if (wybranyIndeks >= 0 && wybranyIndeks < plikiWzorcow.get(wybranaLitera).size()) {
+            Path sciezkaWzorca = plikiWzorcow.get(wybranaLitera).get(wybranyIndeks);
             
             try {
-                int[] wzorzec = PatternUtils.loadPatternFromFile(ścieżkaWzorca);
+                int[] wzorzec = PatternUtils.wczytajWzorzecZPliku(sciezkaWzorca);
                 panelWzorca.ustawWzorzec(wzorzec);
-                etykietaStatusu.setText("Wyświetlanie: " + ścieżkaWzorca.getFileName());
+                etykietaStatusu.setText("Wyświetlany: " + sciezkaWzorca.getFileName());
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, 
-                   "Błąd wczytywania wzorca: " + e.getMessage(),
+                   "Błąd podczas wczytywania wzorca: " + e.getMessage(),
                    "Błąd", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
     
-    private void usuńWybranyWzorzec() {
-        if (wybórWzorca.getItemCount() == 0 || 
-            "Brak dostępnych wzorców".equals(wybórWzorca.getSelectedItem())) {
+    private void usunWybranyWzorzec() {
+        if (wybierakWzorcow.getItemCount() == 0 || 
+            "Brak dostępnych wzorców".equals(wybierakWzorcow.getSelectedItem())) {
             return;
         }
         
-        String wybranaLitera = (String) wybórLitery.getSelectedItem();
-        int wybranyIndeks = wybórWzorca.getSelectedIndex();
+        String wybranaLitera = (String) wybierakLiter.getSelectedItem();
+        int wybranyIndeks = wybierakWzorcow.getSelectedIndex();
         
-        if (wybranyIndeks >= 0 && wybranyIndeks < plikiWzorców.get(wybranaLitera).size()) {
-            Path ścieżkaWzorca = plikiWzorców.get(wybranaLitera).get(wybranyIndeks);
+        if (wybranyIndeks >= 0 && wybranyIndeks < plikiWzorcow.get(wybranaLitera).size()) {
+            Path sciezkaWzorca = plikiWzorcow.get(wybranaLitera).get(wybranyIndeks);
             
             int potwierdzenie = JOptionPane.showConfirmDialog(this,
-                "Czy na pewno chcesz usunąć ten wzorzec?\n" + ścieżkaWzorca.getFileName(),
-                "Potwierdź Usunięcie", JOptionPane.YES_NO_OPTION);
+                "Czy na pewno chcesz usunąć ten wzorzec?\n" + sciezkaWzorca.getFileName(),
+                "Potwierdź usunięcie", JOptionPane.YES_NO_OPTION);
             
             if (potwierdzenie == JOptionPane.YES_OPTION) {
                 try {
-                    Files.delete(ścieżkaWzorca);
+                    Files.delete(sciezkaWzorca);
                     JOptionPane.showMessageDialog(this, "Wzorzec został pomyślnie usunięty.");
                     
-                    inicjalizujPlikiWzorcow();
-                    aktualizujWybórWzorca();
+                    wczytajPlikiWzorcow();
+                    aktualizujWybierakWzorcow();
                 } catch (IOException e) {
                     JOptionPane.showMessageDialog(this, 
                         "Błąd podczas usuwania wzorca: " + e.getMessage(),
@@ -205,33 +204,34 @@ public class PatternViewerApp extends JFrame {
         }
     }
     
+    public void setModal(boolean modal) {
+        super.setModal(modal);
+    }
+    
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
-                // Ignoruj błędy wyglądu
             }
-            new PatternViewerApp().setVisible(true);
+            PatternViewerApp app = new PatternViewerApp();
+            app.setModal(true);
+            app.setVisible(true);
         });
     }
     
-    private class PatternPanel extends JPanel {
-        private static final int ROZMIAR_SIATKI = 8;
-        private static final int ROZMIAR_KOMORKI = 40;
-        private int[][] siatka = new int[ROZMIAR_SIATKI][ROZMIAR_SIATKI];
+    private static class PanelWzorca extends JPanel {
+        private final int[][] siatka = new int[ROZMIAR_SIATKI][ROZMIAR_SIATKI];
         
-        public PatternPanel() {
-            setPreferredSize(new Dimension(ROZMIAR_SIATKI * ROZMIAR_KOMORKI, 
-                                           ROZMIAR_SIATKI * ROZMIAR_KOMORKI));
+        public PanelWzorca() {
+            setPreferredSize(new Dimension(ROZMIAR_SIATKI * ROZMIAR_KOMORKI, ROZMIAR_SIATKI * ROZMIAR_KOMORKI));
             setBorder(BorderFactory.createLineBorder(Color.BLACK));
-            wyczyśćWzorzec();
+            wyczyscWzorzec();
         }
         
         public void ustawWzorzec(int[] wzorzec) {
             if (wzorzec.length != ROZMIAR_SIATKI * ROZMIAR_SIATKI) {
-                throw new IllegalArgumentException("Wzorzec musi mieć długość " 
-                                                + (ROZMIAR_SIATKI * ROZMIAR_SIATKI));
+                throw new IllegalArgumentException("Wzorzec musi mieć długość " + (ROZMIAR_SIATKI * ROZMIAR_SIATKI));
             }
             
             int indeks = 0;
@@ -244,9 +244,9 @@ public class PatternViewerApp extends JFrame {
             repaint();
         }
         
-        public void wyczyśćWzorzec() {
+        public void wyczyscWzorzec() {
             for (int i = 0; i < ROZMIAR_SIATKI; i++) {
-                for (int j = 0; j < ROZMIAR_SIATKI; j++) {
+                for (int j = 0; j < ROZMIAR_SIATKI; j++) { // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI
                     siatka[i][j] = -1;
                 }
             }
@@ -258,14 +258,12 @@ public class PatternViewerApp extends JFrame {
             super.paintComponent(g);
             
             for (int i = 0; i < ROZMIAR_SIATKI; i++) {
-                for (int j = 0; i < ROZMIAR_SIATKI; j++) {
+                for (int j = 0; j < ROZMIAR_SIATKI; j++) { // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI
                     g.setColor(siatka[i][j] == 1 ? Color.BLACK : Color.WHITE);
-                    g.fillRect(j * ROZMIAR_KOMORKI, i * ROZMIAR_KOMORKI, 
-                               ROZMIAR_KOMORKI, ROZMIAR_KOMORKI);
+                    g.fillRect(j * ROZMIAR_KOMORKI, i * ROZMIAR_KOMORKI, ROZMIAR_KOMORKI, ROZMIAR_KOMORKI);
                     
                     g.setColor(Color.GRAY);
-                    g.drawRect(j * ROZMIAR_KOMORKI, i * ROZMIAR_KOMORKI, 
-                               ROZMIAR_KOMORKI, ROZMIAR_KOMORKI);
+                    g.drawRect(j * ROZMIAR_KOMORKI, i * ROZMIAR_KOMORKI, ROZMIAR_KOMORKI, ROZMIAR_KOMORKI);
                 }
             }
         }

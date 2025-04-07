@@ -1,31 +1,36 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.swing.Timer;
 
 public class HopfieldNetworkApp extends JFrame {
-    private GridPanel panelSiatki;
-    private HopfieldNetwork siec;
+    private static final int OPOZNIENIE_ANIMACJI = 80;
+    
+    private final GridPanel panelSiatki;
+    private final HopfieldNetwork siec;
     private Map<String, List<int[]>> wzorce;
-    private JLabel etykietaWyniku;
-    private JLabel etykietaStatystyk;
+    private final JLabel etykietaWyniku;
+    private final JLabel etykietaStatystyk;
+    
+    private JButton przyciskUzupelniania;
+    private Timer czasomierzAnimacji;
+    private boolean animacjaTrwa = false;
+    private boolean siecWytrenowana = false; // Nowa flaga do śledzenia stanu wytrenowania sieci
     
     public HopfieldNetworkApp() {
-        setTitle("Sieć Hopfielda - Rozpoznawanie Liter");
+        super("Sieć Hopfielda - Rozpoznawanie Liter");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout(5, 5));
-        setMinimumSize(new Dimension(450, 700));
+        setMinimumSize(new Dimension(500, 700));
         
-        inicjalizujKomponenty();
-        utworzInterfejs();
-        
-        setSize(500, 900);
-        setResizable(false);
-        setLocationRelativeTo(null);
-    }
-    
-    private void inicjalizujKomponenty() {
         panelSiatki = new GridPanel();
         siec = new HopfieldNetwork(64);
         
@@ -33,7 +38,11 @@ public class HopfieldNetworkApp extends JFrame {
         etykietaWyniku.setFont(new Font("Arial", Font.PLAIN, 14));
         
         etykietaStatystyk = new JLabel("", JLabel.CENTER);
-        etykietaStatystyk.setFont(new Font("Arial", Font.PLAIN, 12));
+        etykietaStatystyk.setFont(new Font("Arial", Font.BOLD, 16));
+        etykietaStatystyk.setForeground(Color.BLACK); // Czarny tekst zamiast niebieskiego
+        etykietaStatystyk.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)), 
+                BorderFactory.createEmptyBorder(8, 12, 8, 12))); // Dodanie ramki i marginesu
         
         wzorce = new HashMap<>();
         wzorce.put("M", new ArrayList<>());
@@ -42,6 +51,14 @@ public class HopfieldNetworkApp extends JFrame {
         
         wczytajWzorce();
         aktualizujStatystyki();
+        
+        utworzInterfejs();
+        
+        setSize(500, 900);
+        setResizable(false);
+        setLocationRelativeTo(null);
+        
+        aktualizujStanPrzyciskow(); // Aktualizacja stanu przycisków po inicjalizacji
     }
     
     private void utworzInterfejs() {
@@ -51,37 +68,91 @@ public class HopfieldNetworkApp extends JFrame {
     }
     
     private JPanel utworzPanelPrzyciskow() {
-        JPanel panel = new JPanel(new GridLayout(2, 4, 5, 5));
+        // Zmiana layoutu na GridBagLayout zamiast GridLayout
+        JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
-        JButton btnZapiszM = utworzPrzycisk("Zapisz M");
-        JButton btnZapiszO = utworzPrzycisk("Zapisz O");
-        JButton btnZapiszN = utworzPrzycisk("Zapisz N");
-        JButton btnPrzegladajWzorce = utworzPrzycisk("Przegląd Wzorców");
-        JButton btnUcz = utworzPrzycisk("Ucz");
-        JButton btnTest = utworzPrzycisk("Test");
-        JButton btnWyczysc = utworzPrzycisk("Wyczyść");
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.insets = new Insets(2, 2, 2, 2);
         
-        btnZapiszM.addActionListener(e -> zapiszWzorzec("M"));
-        btnZapiszO.addActionListener(e -> zapiszWzorzec("O"));
-        btnZapiszN.addActionListener(e -> zapiszWzorzec("N"));
-        btnUcz.addActionListener(e -> trenujSiec());
-        btnTest.addActionListener(e -> rozpoznajWzorzec());
-        btnWyczysc.addActionListener(e -> {
+        JButton zapiszM = utworzPrzycisk("Zapisz M");
+        JButton zapiszO = utworzPrzycisk("Zapisz O");
+        JButton zapiszN = utworzPrzycisk("Zapisz N");
+        JButton przegladajWzorce = utworzPrzycisk("Przeglądaj wzorce");
+        JButton trenuj = utworzPrzycisk("Trenuj");
+        przyciskUzupelniania = utworzPrzycisk("Uzupełnij");
+        JButton wyczysc = utworzPrzycisk("Wyczyść");
+        
+        zapiszM.setToolTipText("Zapisuje bieżący rysunek jako wzorzec litery M");
+        zapiszO.setToolTipText("Zapisuje bieżący rysunek jako wzorzec litery O");
+        zapiszN.setToolTipText("Zapisuje bieżący rysunek jako wzorzec litery N");
+        przegladajWzorce.setToolTipText("Otwiera okno do przeglądania i zarządzania zapisanymi wzorcami");
+        trenuj.setToolTipText("Trenuje sieć neuronową na podstawie zapisanych wzorców");
+        przyciskUzupelniania.setToolTipText("Uzupełnia częściowo narysowany wzorzec do pełnej litery");
+        przyciskUzupelniania.setEnabled(false); // Domyślnie wyłączony dopóki sieć nie zostanie wytrenowana
+        wyczysc.setToolTipText("Czyści siatkę rysowania");
+        
+        zapiszM.addActionListener(e -> zapiszWzorzec("M"));
+        zapiszO.addActionListener(e -> zapiszWzorzec("O"));
+        zapiszN.addActionListener(e -> zapiszWzorzec("N"));
+        trenuj.addActionListener(e -> trenujSiec());
+        przyciskUzupelniania.addActionListener(e -> uzupelnijWzorzec());
+        wyczysc.addActionListener(e -> {
             panelSiatki.wyczyscSiatke();
             etykietaWyniku.setText("Wynik: Brak");
-        });
-        btnPrzegladajWzorce.addActionListener(e -> {
-            new PatternViewerApp().setVisible(true);
+            zatrzymajAnimacje();
         });
         
-        panel.add(btnZapiszM);
-        panel.add(btnZapiszO);
-        panel.add(btnZapiszN);
-        panel.add(btnPrzegladajWzorce);
-        panel.add(btnUcz);
-        panel.add(btnTest);
-        panel.add(btnWyczysc);
+        przegladajWzorce.addActionListener(e -> {
+            try {
+                PatternViewerApp przeglad = new PatternViewerApp();
+                przeglad.setLocationRelativeTo(this); // Wyśrodkuj względem okna głównego
+                przeglad.setVisible(true);
+            } catch (Exception ex) {
+                ex.printStackTrace(); // Dodajemy logowanie błędów dla diagnostyki
+                JOptionPane.showMessageDialog(this, 
+                    "Błąd podczas otwierania przeglądarki wzorców: " + ex.getMessage(),
+                    "Błąd", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+        // Pierwszy wiersz
+        gbc.gridy = 0;
+        
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        panel.add(zapiszM, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(zapiszO, gbc);
+        
+        gbc.gridx = 2;
+        panel.add(zapiszN, gbc);
+        
+        gbc.gridx = 3;
+        panel.add(wyczysc, gbc);
+        
+        // Drugi wiersz
+        gbc.gridy = 1;
+        
+        gbc.gridx = 0;
+        panel.add(trenuj, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(przyciskUzupelniania, gbc);
+        
+        // Przycisk "Przeglądaj wzorce" zajmuje dwie kolumny w drugim wierszu,
+        // ale zachowuje standardowy wygląd jak inne przyciski
+        gbc.gridx = 2;
+        gbc.gridwidth = 2; // Ustawienie szerokości na dwie kolumny
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 1.0;
+        
+        // Zwiększamy tylko rozmiar czcionki, bez zmiany kolorów i ramki
+        przegladajWzorce.setFont(new Font("Arial", Font.BOLD, 16));
+        
+        panel.add(przegladajWzorce, gbc);
         
         return panel;
     }
@@ -91,12 +162,12 @@ public class HopfieldNetworkApp extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         panel.setPreferredSize(new Dimension(400, 200));
         
-        JScrollPane scrollPane = new JScrollPane(etykietaWyniku);
-        scrollPane.setBorder(null);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        JScrollPane przewijacz = new JScrollPane(etykietaWyniku);
+        przewijacz.setBorder(null);
+        przewijacz.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         
         JPanel panelEtykiet = new JPanel(new BorderLayout());
-        panelEtykiet.add(scrollPane, BorderLayout.CENTER);
+        panelEtykiet.add(przewijacz, BorderLayout.CENTER);
         panelEtykiet.add(etykietaStatystyk, BorderLayout.SOUTH);
         
         panel.add(panelEtykiet, BorderLayout.CENTER);
@@ -130,10 +201,10 @@ public class HopfieldNetworkApp extends JFrame {
     private void zapiszWzorzec(String litera) {
         try {
             int[] wzorzec = panelSiatki.pobierzSiatkeJakoTablice();
-            PatternUtils.savePattern(wzorzec, litera);
+            PatternUtils.zapiszWzorzec(wzorzec, litera);
             wzorce.get(litera).add(wzorzec);
             
-            JOptionPane.showMessageDialog(this, "Wzorzec " + litera + " został zapisany!");
+            JOptionPane.showMessageDialog(this, "Wzorzec " + litera + " został zapisany pomyślnie!");
             aktualizujStatystyki();
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, 
@@ -144,7 +215,7 @@ public class HopfieldNetworkApp extends JFrame {
     
     private void wczytajWzorce() {
         try {
-            wzorce = PatternUtils.loadAllPatterns();
+            wzorce = PatternUtils.wczytajWszystkieWzorce();
             aktualizujStatystyki();
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, 
@@ -154,172 +225,248 @@ public class HopfieldNetworkApp extends JFrame {
     }
     
     private void trenujSiec() {
-        List<int[]> wzorceTreningowe = new ArrayList<>();
-        for (List<int[]> listaWzorcow : wzorce.values()) {
-            wzorceTreningowe.addAll(listaWzorcow);
-        }
+        List<int[]> wzorceTreningowe = wzorce.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
         
         if (wzorceTreningowe.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Brak wzorców do nauki!");
+            JOptionPane.showMessageDialog(this, "Brak wzorców do treningu!");
             return;
         }
         
         if (wzorceTreningowe.size() < 3) {
             JOptionPane.showMessageDialog(this, 
-                "Zaleca się posiadanie przynajmniej po jednym wzorcu dla każdej litery (M, O, N).",
+                "Zaleca się posiadanie co najmniej jednego wzorca dla każdej litery (M, O, N).",
                 "Uwaga", JOptionPane.WARNING_MESSAGE);
         }
         
-        siec.train(wzorceTreningowe.toArray(new int[0][]));
+        siec.trenuj(wzorceTreningowe.toArray(new int[0][]));
+        siecWytrenowana = true; // Ustawienie flagi po wytrenowaniu sieci
+        aktualizujStanPrzyciskow(); // Aktualizacja stanu przycisków
+        
         JOptionPane.showMessageDialog(this, 
-            "Sieć nauczona " + wzorceTreningowe.size() + " wzorcami!");
+            "Sieć wytrenowana na " + wzorceTreningowe.size() + " wzorcach!");
     }
     
-    private void rozpoznajWzorzec() {
-        int[] biezacyWzorzec = panelSiatki.pobierzSiatkeJakoTablice();
-        
-        if (czyBrakWzorcow()) {
+    private void uzupelnijWzorzec() {
+        if (!siecWytrenowana) {
             JOptionPane.showMessageDialog(this, 
-                "Najpierw zapisz co najmniej po jednym wzorcu dla każdej litery (M, O, N) i naciśnij przycisk \"Ucz\".",
+                "Najpierw wytrenuj sieć przyciskiem \"Trenuj\".",
+                "Sieć niewytrenowana", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (wzorcePuste()) {
+            JOptionPane.showMessageDialog(this, 
+                "Brak wzorców do rozpoznawania. Zapisz wzorce i wytrenuj sieć.",
                 "Brak wzorców", JOptionPane.WARNING_MESSAGE);
             return;
         }
         
-        if (!czyMaAktywnePiksele(biezacyWzorzec)) {
+        if (animacjaTrwa) {
+            zatrzymajAnimacje();
+            return;
+        }
+        
+        int[] biezacyWzorzec = panelSiatki.pobierzSiatkeJakoTablice();
+        if (!maAktywnePiksele(biezacyWzorzec)) {
             JOptionPane.showMessageDialog(this, 
-                "Narysuj coś przed testowaniem!",
+                "Narysuj fragment litery przed uzupełnianiem!",
                 "Pusty wzorzec", JOptionPane.WARNING_MESSAGE);
             return;
         }
         
-        Map<String, Integer> odleglosci = new HashMap<>();
-        Map<String, int[]> najlepszeWzorce = new HashMap<>();
+        int[] oryginalnyWzorzec = biezacyWzorzec.clone();
+        panelSiatki.zapiszBiezacyWzorzec();
         
-        for (String litera : wzorce.keySet()) {
-            WynikPorownania wynik = znajdzNajblizszyWzorzec(biezacyWzorzec, wzorce.get(litera));
-            odleglosci.put(litera, wynik.odleglosc);
-            najlepszeWzorce.put(litera, wynik.wzorzec);
+        DopasowanieWzorca najlepszeDopasowanie = znajdzNajlepiejDopasowanyWzorzec(oryginalnyWzorzec);
+        
+        if (najlepszeDopasowanie != null) {
+            rozpocznijAnimowaneUzupelnianie(oryginalnyWzorzec, najlepszeDopasowanie);
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Nie znaleziono pasującego wzorca.\nŻaden z zapisanych wzorców nie zawiera wszystkich narysowanych pikseli.",
+                "Brak dopasowania", JOptionPane.INFORMATION_MESSAGE);
         }
-        
-        String rozpoznanaLitera = znajdzNajblizszyKlucz(odleglosci);
-        int[] najlepszyWzorzec = najlepszeWzorce.get(rozpoznanaLitera);
-        
-        panelSiatki.ustawSiatkeZTablicy(najlepszyWzorzec);
-        
-        wyswietlWyniki(biezacyWzorzec, najlepszyWzorzec, rozpoznanaLitera, odleglosci);
     }
     
-    private WynikPorownania znajdzNajblizszyWzorzec(int[] wzorzec, List<int[]> wzorceDoPorowniania) {
-        int minOdleglosc = Integer.MAX_VALUE;
-        int[] najlepszyWzorzec = null;
+    private DopasowanieWzorca znajdzNajlepiejDopasowanyWzorzec(int[] wzorzecUzytkownika) {
+        DopasowanieWzorca najlepszeDopasowanie = null;
+        int minPikseliDoDodania = Integer.MAX_VALUE;
         
-        for (int[] wzorzecOdniesienia : wzorceDoPorowniania) {
-            int odleglosc = siec.hammingDistance(wzorzec, wzorzecOdniesienia);
-            if (odleglosc < minOdleglosc) {
-                minOdleglosc = odleglosc;
-                najlepszyWzorzec = wzorzecOdniesienia;
+        for (String litera : wzorce.keySet()) {
+            for (int[] wzorzecBazowy : wzorce.get(litera)) {
+                if (wszystkiePikseleZgodne(wzorzecUzytkownika, wzorzecBazowy)) {
+                    int pikseleDoDodania = policzPikseleDoDodania(wzorzecUzytkownika, wzorzecBazowy);
+                    if (pikseleDoDodania < minPikseliDoDodania) {
+                        minPikseliDoDodania = pikseleDoDodania;
+                        najlepszeDopasowanie = new DopasowanieWzorca(litera, wzorzecBazowy, pikseleDoDodania);
+                    }
+                }
             }
         }
         
-        return new WynikPorownania(najlepszyWzorzec, minOdleglosc);
+        return najlepszeDopasowanie;
     }
     
-    private void wyswietlWyniki(int[] oryginalnyWzorzec, int[] najlepszyWzorzec, 
-                            String rozpoznanaLitera, Map<String, Integer> odleglosci) {
-        List<Map.Entry<String, Integer>> posortowaneOdleglosci = 
-            new ArrayList<>(odleglosci.entrySet());
-        posortowaneOdleglosci.sort(Map.Entry.comparingByValue());
+    private boolean wszystkiePikseleZgodne(int[] wzorzecUzytkownika, int[] wzorzecBazowy) {
+        for (int i = 0; i < wzorzecUzytkownika.length; i++) {
+            if (wzorzecUzytkownika[i] == 1 && wzorzecBazowy[i] == -1) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    private int policzPikseleDoDodania(int[] wzorzecUzytkownika, int[] wzorzecBazowy) {
+        int licznik = 0;
+        for (int i = 0; i < wzorzecBazowy.length; i++) {
+            if (wzorzecBazowy[i] == 1 && wzorzecUzytkownika[i] == -1) {
+                licznik++;
+            }
+        }
+        return licznik;
+    }
+    
+    private void rozpocznijAnimowaneUzupelnianie(int[] oryginalnyWzorzec, DopasowanieWzorca dopasowanie) {
+        przyciskUzupelniania.setText("Zatrzymaj");
+        animacjaTrwa = true;
         
-        int zmienionePiksele = liczbaZmienionychPikseli(oryginalnyWzorzec, najlepszyWzorzec);
-        int dystans = odleglosci.get(rozpoznanaLitera);
+        List<Integer> pikseleDoDodania = new ArrayList<>();
+        for (int i = 0; i < oryginalnyWzorzec.length; i++) {
+            if (dopasowanie.wzorzec[i] == 1 && oryginalnyWzorzec[i] == -1) {
+                pikseleDoDodania.add(i);
+            }
+        }
         
-        StringBuilder tekstWyniku = new StringBuilder("<html>");
-        tekstWyniku.append("<div style='width:380px'>");
+        Collections.shuffle(pikseleDoDodania);
         
-        tekstWyniku.append("<h3>WYNIK PORÓWNANIA</h3>");
+        final int[] aktualnyWzorzec = oryginalnyWzorzec.clone();
+        
+        etykietaWyniku.setText(String.format("<html><div style='width:380px'><b>Uzupełnianie wzorca litery %s...</b><br>" +
+                "Pozostałe piksele: %d</div></html>", dopasowanie.litera, pikseleDoDodania.size()));
+        
+        czasomierzAnimacji = new Timer(OPOZNIENIE_ANIMACJI, new AnimatorUzupelnianiaWzorca(
+                aktualnyWzorzec, oryginalnyWzorzec, pikseleDoDodania, dopasowanie.litera));
+        
+        czasomierzAnimacji.start();
+    }
+    
+    private class AnimatorUzupelnianiaWzorca implements ActionListener {
+        private final int[] aktualnyWzorzec;
+        private final int[] oryginalnyWzorzec;
+        private final List<Integer> pikseleDoDodania;
+        private final String litera;
+        private int indeksPiksela = 0;
+        
+        public AnimatorUzupelnianiaWzorca(int[] aktualnyWzorzec, int[] oryginalnyWzorzec, 
+                                      List<Integer> pikseleDoDodania, String litera) {
+            this.aktualnyWzorzec = aktualnyWzorzec;
+            this.oryginalnyWzorzec = oryginalnyWzorzec;
+            this.pikseleDoDodania = pikseleDoDodania;
+            this.litera = litera;
+        }
+        
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (indeksPiksela >= pikseleDoDodania.size()) {
+                zatrzymajAnimacje();
+                zakonczUzupelnianie(aktualnyWzorzec, oryginalnyWzorzec, litera);
+                return;
+            }
+            
+            int pikselDoZmiany = pikseleDoDodania.get(indeksPiksela++);
+            aktualnyWzorzec[pikselDoZmiany] = 1;
+            
+            panelSiatki.ustawSiatkeZTablicy(aktualnyWzorzec);
+            
+            int pozostalo = pikseleDoDodania.size() - indeksPiksela;
+            etykietaWyniku.setText(String.format("<html><div style='width:380px'><b>Uzupełnianie wzorca litery %s...</b><br>" +
+                    "Pozostałe piksele: %d<br>" +
+                    "Dodano piksel w: (%d,%d)</div></html>", 
+                    litera, pozostalo, pikselDoZmiany / 8, pikselDoZmiany % 8));
+        }
+    }
+    
+    private void zatrzymajAnimacje() {
+        if (czasomierzAnimacji != null && czasomierzAnimacji.isRunning()) {
+            czasomierzAnimacji.stop();
+        }
+        animacjaTrwa = false;
+        przyciskUzupelniania.setText("Uzupełnij");
+    }
+    
+    private void zakonczUzupelnianie(int[] finalnyWzorzec, int[] oryginalnyWzorzec, String rozpoznanaLitera) {
+        for (int i = 0; i < finalnyWzorzec.length; i++) {
+            if (oryginalnyWzorzec[i] == 1) {
+                finalnyWzorzec[i] = 1;
+            }
+        }
+        
+        panelSiatki.ustawSiatkeZTablicy(finalnyWzorzec);
+        
+        StringBuilder tekstWyniku = new StringBuilder("<html><div style='width:380px'>");
+        tekstWyniku.append("<h3>WYNIK DOPASOWANIA WZORCA</h3>");
         tekstWyniku.append("Rozpoznana litera: <b style='font-size:18px;'>").append(rozpoznanaLitera).append("</b><br><br>");
-        
-        tekstWyniku.append("<b>Ranking podobieństwa:</b><br>");
-        for (Map.Entry<String, Integer> wpis : posortowaneOdleglosci) {
-            tekstWyniku.append("- ").append(wpis.getKey())
-                     .append(" (dystans = ").append(wpis.getValue()).append(")<br>");
-        }
-        
-        tekstWyniku.append("<br>Zmienione piksele: ").append(zmienionePiksele);
-        
-        if (dystans <= 5) {
-            tekstWyniku.append("<br><br><span style='color:green;'>Wysokie podobieństwo do wzorca</span>");
-        } else if (dystans <= 10) {
-            tekstWyniku.append("<br><br><span style='color:orange;'>Umiarkowane podobieństwo do wzorca</span>");
-        } else {
-            tekstWyniku.append("<br><br><span style='color:red;'>Niskie podobieństwo - niepewne rozpoznanie</span>");
-        }
-        
+        tekstWyniku.append("Wzorzec został uzupełniony na podstawie dokładnego dopasowania.<br><br>");
+        tekstWyniku.append("<span style='color:green;'><b>Uzupełnianie zakończone!</b></span>");
         tekstWyniku.append("</div></html>");
+        
         etykietaWyniku.setText(tekstWyniku.toString());
     }
     
-    private boolean czyBrakWzorcow() {
-        for (String litera : wzorce.keySet()) {
-            if (wzorce.get(litera).isEmpty()) {
-                return true;
-            }
-        }
-        return false;
+    private boolean wzorcePuste() {
+        return wzorce.values().stream().anyMatch(List::isEmpty);
     }
     
-    private boolean czyMaAktywnePiksele(int[] wzorzec) {
+    private boolean maAktywnePiksele(int[] wzorzec) {
         for (int piksel : wzorzec) {
             if (piksel == 1) return true;
         }
         return false;
     }
     
-    private String znajdzNajblizszyKlucz(Map<String, Integer> mapa) {
-        String najlepszyKlucz = null;
-        int najmnOdleglosc = Integer.MAX_VALUE;
-        
-        for (Map.Entry<String, Integer> wpis : mapa.entrySet()) {
-            if (wpis.getValue() < najmnOdleglosc) {
-                najmnOdleglosc = wpis.getValue();
-                najlepszyKlucz = wpis.getKey();
-            }
-        }
-        
-        return najlepszyKlucz;
-    }
-    
-    private int liczbaZmienionychPikseli(int[] przed, int[] po) {
-        int licznik = 0;
-        for (int i = 0; i < przed.length; i++) {
-            if (przed[i] != po[i]) licznik++;
-        }
-        return licznik;
-    }
-    
     private void aktualizujStatystyki() {
-        int liczbaM = PatternUtils.countPatterns("M");
-        int liczbaO = PatternUtils.countPatterns("O");
-        int liczbaN = PatternUtils.countPatterns("N");
+        int liczbaM = PatternUtils.policzWzorce("M");
+        int liczbaO = PatternUtils.policzWzorce("O");
+        int liczbaN = PatternUtils.policzWzorce("N");
         
-        etykietaStatystyk.setText("Zapisane wzorce: M=" + liczbaM + ", O=" + liczbaO + ", N=" + liczbaN);
+        // Usuwam kolorowe formatowanie, zostawiam tylko pogrubienie
+        etykietaStatystyk.setText(String.format(
+            "<html><div style='text-align: center;'>Zapisane wzorce: " +
+            "<b>M=%d</b>, <b>O=%d</b>, <b>N=%d</b>" +
+            "</div></html>", 
+            liczbaM, liczbaO, liczbaN
+        ));
     }
     
-    private static class WynikPorownania {
-        final int[] wzorzec;
-        final int odleglosc;
+    private void aktualizujStanPrzyciskow() {
+        przyciskUzupelniania.setEnabled(siecWytrenowana && !wzorcePuste());
         
-        WynikPorownania(int[] wzorzec, int odleglosc) {
-            this.wzorzec = wzorzec;
-            this.odleglosc = odleglosc;
+        if (!siecWytrenowana) {
+            etykietaWyniku.setText("<html>Aby rozpocząć rozpoznawanie wzorców:<br>" +
+                "1. Zapisz kilka wzorców liter<br>" +
+                "2. Kliknij przycisk \"Trenuj\"<br>" +
+                "3. Narysuj fragment litery i kliknij \"Uzupełnij\"</html>");
         }
     }
-
+    
+    private static class DopasowanieWzorca {
+        final String litera;
+        final int[] wzorzec;
+        final int pikseleDoDodania;
+        
+        DopasowanieWzorca(String litera, int[] wzorzec, int pikseleDoDodania) {
+            this.litera = litera;
+            this.wzorzec = wzorzec;
+            this.pikseleDoDodania = pikseleDoDodania;
+        }
+    }
+    
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
-            // Ignorowanie błędów wyglądu
         }
         
         SwingUtilities.invokeLater(() -> new HopfieldNetworkApp().setVisible(true));

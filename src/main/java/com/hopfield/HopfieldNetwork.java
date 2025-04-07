@@ -12,7 +12,7 @@ public class HopfieldNetwork {
             throw new IllegalArgumentException("Brak wzorców do treningu");
         }
         
-        zresetujWagi(); // Upewnij się, że wagi są zresetowane przed każdym treningiem
+        zresetujWagi();
         zastosujReguleHebbianowska(wzorce);
     }
     
@@ -27,7 +27,7 @@ public class HopfieldNetwork {
     private void zastosujReguleHebbianowska(int[][] wzorce) {
         for (int[] wzorzec : wzorce) {
             for (int i = 0; i < rozmiar; i++) {
-                for (int j = 0; i < rozmiar; j++) {
+                for (int j = 0; j < rozmiar; j++) {
                     if (i != j) {
                         wagi[i][j] += (double)(wzorzec[i] * wzorzec[j]) / wzorce.length;
                     }
@@ -97,7 +97,7 @@ public class HopfieldNetwork {
         double energia = 0.0;
         
         for (int i = 0; i < rozmiar; i++) {
-            for (int j = 0; j < rozmiar; j++) { // Poprawka błędu w pętli - było "j < i"
+            for (int j = 0; j < rozmiar; j++) {
                 if (i != j) {
                     energia -= wagi[i][j] * stan[i] * stan[j] * 0.5;
                 }

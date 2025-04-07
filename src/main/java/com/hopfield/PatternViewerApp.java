@@ -8,7 +8,7 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class PatternViewerApp extends JDialog { // Zmiana z JFrame na JDialog dla modalności
+public class PatternViewerApp extends JDialog {
     private static final String[] OPCJE_LITER = {"M", "O", "N"};
     private static final int ROZMIAR_SIATKI = 8;
     private static final int ROZMIAR_KOMORKI = 40;
@@ -21,8 +21,8 @@ public class PatternViewerApp extends JDialog { // Zmiana z JFrame na JDialog dl
     private Map<String, List<Path>> plikiWzorcow;
     
     public PatternViewerApp() {
-        super((Frame)null, "Przeglądarka wzorców", true); // Jawnie ustawiamy jako modalny dialog
-        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE); // Zmiana z JFrame na JDialog
+        super((Frame)null, "Przeglądarka wzorców", true);
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
         
         inicjalizujKomponenty();
@@ -246,7 +246,7 @@ public class PatternViewerApp extends JDialog { // Zmiana z JFrame na JDialog dl
         
         public void wyczyscWzorzec() {
             for (int i = 0; i < ROZMIAR_SIATKI; i++) {
-                for (int j = 0; j < ROZMIAR_SIATKI; j++) { // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI
+                for (int j = 0; j < ROZMIAR_SIATKI; j++) {
                     siatka[i][j] = -1;
                 }
             }
@@ -258,7 +258,7 @@ public class PatternViewerApp extends JDialog { // Zmiana z JFrame na JDialog dl
             super.paintComponent(g);
             
             for (int i = 0; i < ROZMIAR_SIATKI; i++) {
-                for (int j = 0; j < ROZMIAR_SIATKI; j++) { // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI // NAPRAWIONO: j < ROZMIAR_SIATKI zamiast i < ROZMIAR_SIATKI
+                for (int j = 0; j < ROZMIAR_SIATKI; j++) {
                     g.setColor(siatka[i][j] == 1 ? Color.BLACK : Color.WHITE);
                     g.fillRect(j * ROZMIAR_KOMORKI, i * ROZMIAR_KOMORKI, ROZMIAR_KOMORKI, ROZMIAR_KOMORKI);
                     

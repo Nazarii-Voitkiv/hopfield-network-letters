@@ -23,7 +23,7 @@ public class HopfieldNetworkApp extends JFrame {
     private JButton przyciskUzupelniania;
     private Timer czasomierzAnimacji;
     private boolean animacjaTrwa = false;
-    private boolean siecWytrenowana = false; // Nowa flaga do śledzenia stanu wytrenowania sieci
+    private boolean siecWytrenowana = false;
     
     public HopfieldNetworkApp() {
         super("Sieć Hopfielda - Rozpoznawanie Liter");
@@ -39,10 +39,10 @@ public class HopfieldNetworkApp extends JFrame {
         
         etykietaStatystyk = new JLabel("", JLabel.CENTER);
         etykietaStatystyk.setFont(new Font("Arial", Font.BOLD, 16));
-        etykietaStatystyk.setForeground(Color.BLACK); // Czarny tekst zamiast niebieskiego
+        etykietaStatystyk.setForeground(Color.BLACK);
         etykietaStatystyk.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200)), 
-                BorderFactory.createEmptyBorder(8, 12, 8, 12))); // Dodanie ramki i marginesu
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)));
         
         wzorce = new HashMap<>();
         wzorce.put("M", new ArrayList<>());
@@ -58,7 +58,7 @@ public class HopfieldNetworkApp extends JFrame {
         setResizable(false);
         setLocationRelativeTo(null);
         
-        aktualizujStanPrzyciskow(); // Aktualizacja stanu przycisków po inicjalizacji
+        aktualizujStanPrzyciskow();
     }
     
     private void utworzInterfejs() {
@@ -68,7 +68,6 @@ public class HopfieldNetworkApp extends JFrame {
     }
     
     private JPanel utworzPanelPrzyciskow() {
-        // Zmiana layoutu na GridBagLayout zamiast GridLayout
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
@@ -90,7 +89,7 @@ public class HopfieldNetworkApp extends JFrame {
         przegladajWzorce.setToolTipText("Otwiera okno do przeglądania i zarządzania zapisanymi wzorcami");
         trenuj.setToolTipText("Trenuje sieć neuronową na podstawie zapisanych wzorców");
         przyciskUzupelniania.setToolTipText("Uzupełnia częściowo narysowany wzorzec do pełnej litery");
-        przyciskUzupelniania.setEnabled(false); // Domyślnie wyłączony dopóki sieć nie zostanie wytrenowana
+        przyciskUzupelniania.setEnabled(false);
         wyczysc.setToolTipText("Czyści siatkę rysowania");
         
         zapiszM.addActionListener(e -> zapiszWzorzec("M"));
@@ -107,17 +106,16 @@ public class HopfieldNetworkApp extends JFrame {
         przegladajWzorce.addActionListener(e -> {
             try {
                 PatternViewerApp przeglad = new PatternViewerApp();
-                przeglad.setLocationRelativeTo(this); // Wyśrodkuj względem okna głównego
+                przeglad.setLocationRelativeTo(this);
                 przeglad.setVisible(true);
             } catch (Exception ex) {
-                ex.printStackTrace(); // Dodajemy logowanie błędów dla diagnostyki
+                ex.printStackTrace();
                 JOptionPane.showMessageDialog(this, 
                     "Błąd podczas otwierania przeglądarki wzorców: " + ex.getMessage(),
                     "Błąd", JOptionPane.ERROR_MESSAGE);
             }
         });
         
-        // Pierwszy wiersz
         gbc.gridy = 0;
         
         gbc.gridx = 0;
@@ -132,8 +130,7 @@ public class HopfieldNetworkApp extends JFrame {
         
         gbc.gridx = 3;
         panel.add(wyczysc, gbc);
-        
-        // Drugi wiersz
+
         gbc.gridy = 1;
         
         gbc.gridx = 0;
@@ -142,14 +139,11 @@ public class HopfieldNetworkApp extends JFrame {
         gbc.gridx = 1;
         panel.add(przyciskUzupelniania, gbc);
         
-        // Przycisk "Przeglądaj wzorce" zajmuje dwie kolumny w drugim wierszu,
-        // ale zachowuje standardowy wygląd jak inne przyciski
         gbc.gridx = 2;
-        gbc.gridwidth = 2; // Ustawienie szerokości na dwie kolumny
+        gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 1.0;
         
-        // Zwiększamy tylko rozmiar czcionki, bez zmiany kolorów i ramki
         przegladajWzorce.setFont(new Font("Arial", Font.BOLD, 16));
         
         panel.add(przegladajWzorce, gbc);
@@ -241,8 +235,8 @@ public class HopfieldNetworkApp extends JFrame {
         }
         
         siec.trenuj(wzorceTreningowe.toArray(new int[0][]));
-        siecWytrenowana = true; // Ustawienie flagi po wytrenowaniu sieci
-        aktualizujStanPrzyciskow(); // Aktualizacja stanu przycisków
+        siecWytrenowana = true; 
+        aktualizujStanPrzyciskow(); 
         
         JOptionPane.showMessageDialog(this, 
             "Sieć wytrenowana na " + wzorceTreningowe.size() + " wzorcach!");
@@ -431,7 +425,6 @@ public class HopfieldNetworkApp extends JFrame {
         int liczbaO = PatternUtils.policzWzorce("O");
         int liczbaN = PatternUtils.policzWzorce("N");
         
-        // Usuwam kolorowe formatowanie, zostawiam tylko pogrubienie
         etykietaStatystyk.setText(String.format(
             "<html><div style='text-align: center;'>Zapisane wzorce: " +
             "<b>M=%d</b>, <b>O=%d</b>, <b>N=%d</b>" +

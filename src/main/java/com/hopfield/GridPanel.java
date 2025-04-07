@@ -13,8 +13,8 @@ public class GridPanel extends JPanel {
     private final int[][] siatka = new int[ROZMIAR_SIATKI][ROZMIAR_SIATKI];
     private final JButton[][] przyciski = new JButton[ROZMIAR_SIATKI][ROZMIAR_SIATKI];
     private int[] ostatniWzorzec;
-    private boolean rysowanie = false;  // Flaga do śledzenia, czy użytkownik aktualnie rysuje
-    private int aktualnyTrybRysowania = 1;  // 1 = czarny (aktywny), -1 = biały (nieaktywny)
+    private boolean rysowanie = false;  
+    private int aktualnyTrybRysowania = 1;
 
     public GridPanel() {
         skonfigurujPanel();
@@ -64,15 +64,12 @@ public class GridPanel extends JPanel {
         przycisk.setBackground(Color.WHITE);
         przycisk.setUI(new BasicButtonUI());
         
-        // Usuń ActionListener, obsługa będzie przez MouseListener
-        
         return przycisk;
     }
     
     private void dodajObslugeRysowania() {
         MouseHandler handler = new MouseHandler();
         
-        // Dodaj obsługę zdarzeń myszy do każdego przycisku
         for (int i = 0; i < ROZMIAR_SIATKI; i++) {
             for (int j = 0; j < ROZMIAR_SIATKI; j++) {
                 final int wiersz = i;
@@ -82,7 +79,6 @@ public class GridPanel extends JPanel {
                 przycisk.addMouseListener(handler);
                 przycisk.addMouseMotionListener(handler);
                 
-                // Potrzebne do przechowania indeksów przycisku
                 przycisk.putClientProperty("wiersz", wiersz);
                 przycisk.putClientProperty("kolumna", kolumna);
             }
@@ -96,8 +92,6 @@ public class GridPanel extends JPanel {
             int wiersz = (int) przycisk.getClientProperty("wiersz");
             int kolumna = (int) przycisk.getClientProperty("kolumna");
             
-            // Ustal tryb rysowania na podstawie początkowego stanu komórki
-            // Jeśli komórka jest biała, będziemy rysować czarnym i odwrotnie
             aktualnyTrybRysowania = (siatka[wiersz][kolumna] == 1) ? -1 : 1;
             
             rysowanie = true;
@@ -107,28 +101,24 @@ public class GridPanel extends JPanel {
         @Override
         public void mouseReleased(MouseEvent e) {
             rysowanie = false;
-            zapiszBiezacyWzorzec();  // Zapisz wzorzec po zakończeniu rysowania
+            zapiszBiezacyWzorzec();
         }
         
         @Override
         public void mouseDragged(MouseEvent e) {
             if (!rysowanie) return;
-            
-            // Zamiast szukać komponentu pod myszą, obliczamy pozycję na podstawie współrzędnych
+
             Point pozycjaMyszy;
             
             if (e.getSource() instanceof JButton) {
-                // Konwertujemy współrzędne z poziomu przycisku do poziomu panelu siatki
                 pozycjaMyszy = SwingUtilities.convertPoint((Component) e.getSource(), e.getPoint(), GridPanel.this);
             } else {
                 pozycjaMyszy = e.getPoint();
             }
             
-            // Oblicz wiersz i kolumnę na podstawie współrzędnych
             int wiersz = pozycjaMyszy.y / ROZMIAR_KOMORKI;
             int kolumna = pozycjaMyszy.x / ROZMIAR_KOMORKI;
             
-            // Upewnij się, że jesteśmy w granicach siatki
             if (wiersz >= 0 && wiersz < ROZMIAR_SIATKI && kolumna >= 0 && kolumna < ROZMIAR_SIATKI) {
                 zmienStanKomorki(wiersz, kolumna, aktualnyTrybRysowania);
             }
@@ -141,7 +131,6 @@ public class GridPanel extends JPanel {
     }
     
     private void zmienStanKomorki(int wiersz, int kolumna, int nowyStan) {
-        // Zmieniamy stan tylko jeśli jest różny od aktualnego
         if (siatka[wiersz][kolumna] != nowyStan) {
             siatka[wiersz][kolumna] = nowyStan;
             aktualizujWygladPrzycisku(przyciski[wiersz][kolumna], nowyStan);

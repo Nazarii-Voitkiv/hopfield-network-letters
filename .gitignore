@@ -2,3 +2,5 @@
 /node_modules
 .DS_Store
 /.idea
+out
+hopfield-network-letters.iml

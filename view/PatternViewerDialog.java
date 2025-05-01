@@ -113,10 +113,9 @@ public class PatternViewerDialog extends JDialog {
     }
     
     private void deleteSelectedPattern() {
-        // Реализация удаления шаблона (опционально)
         JOptionPane.showMessageDialog(this, 
-            "Функция удаления пока не реализована.", 
-            "Информация", 
+            "Funkcja usuwania nie jest jeszcze zaimplementowana.", 
+            "Informacja", 
             JOptionPane.INFORMATION_MESSAGE);
     }
     

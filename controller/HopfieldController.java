@@ -104,7 +104,6 @@ public class HopfieldController {
         dialog.setLocationRelativeTo(parent);
         dialog.setVisible(true);
         
-        // После закрытия окна просмотра - обновляем статистику и сеть
         mainView.updatePatternStats();
         trainNetwork();
     }

@@ -117,7 +117,7 @@ public class GridView extends JPanel {
         
         @Override
         public void mouseMoved(MouseEvent e) {
-            // Не требуется реализация
+            
         }
     }
     

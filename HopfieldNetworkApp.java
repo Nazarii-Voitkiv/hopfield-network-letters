@@ -4,18 +4,21 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.swing.Timer;
 
 public class HopfieldNetworkApp extends JFrame {
-    private static final int OPOZNIENIE_ANIMACJI = 80;
+    private static final int MAX_ITERACJI_HOPFIELD = 1;
+    private static int OPOZNIENIE_ANIMACJI = 80;
     
     private final GridPanel panelSiatki;
-    private final HopfieldNetwork siec;
+    private HopfieldNetwork siec;
     private Map<String, List<int[]>> wzorce;
     private final JLabel etykietaWyniku;
     private final JLabel etykietaStatystyk;
@@ -50,7 +53,7 @@ public class HopfieldNetworkApp extends JFrame {
         wzorce.put("N", new ArrayList<>());
         
         wczytajWzorce();
-        aktualizujStatystyki();
+        trenujSiec();
         
         utworzInterfejs();
         
@@ -79,7 +82,6 @@ public class HopfieldNetworkApp extends JFrame {
         JButton zapiszO = utworzPrzycisk("Zapisz O");
         JButton zapiszN = utworzPrzycisk("Zapisz N");
         JButton przegladajWzorce = utworzPrzycisk("Przeglądaj wzorce");
-        JButton trenuj = utworzPrzycisk("Trenuj");
         przyciskUzupelniania = utworzPrzycisk("Uzupełnij");
         JButton wyczysc = utworzPrzycisk("Wyczyść");
         
@@ -87,15 +89,12 @@ public class HopfieldNetworkApp extends JFrame {
         zapiszO.setToolTipText("Zapisuje bieżący rysunek jako wzorzec litery O");
         zapiszN.setToolTipText("Zapisuje bieżący rysunek jako wzorzec litery N");
         przegladajWzorce.setToolTipText("Otwiera okno do przeglądania i zarządzania zapisanymi wzorcami");
-        trenuj.setToolTipText("Trenuje sieć neuronową na podstawie zapisanych wzorców");
         przyciskUzupelniania.setToolTipText("Uzupełnia częściowo narysowany wzorzec do pełnej litery");
-        przyciskUzupelniania.setEnabled(false);
         wyczysc.setToolTipText("Czyści siatkę rysowania");
         
         zapiszM.addActionListener(e -> zapiszWzorzec("M"));
         zapiszO.addActionListener(e -> zapiszWzorzec("O"));
         zapiszN.addActionListener(e -> zapiszWzorzec("N"));
-        trenuj.addActionListener(e -> trenujSiec());
         przyciskUzupelniania.addActionListener(e -> uzupelnijWzorzec());
         wyczysc.addActionListener(e -> {
             panelSiatki.wyczyscSiatke();
@@ -110,9 +109,6 @@ public class HopfieldNetworkApp extends JFrame {
                 przeglad.setVisible(true);
             } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, 
-                    "Błąd podczas otwierania przeglądarki wzorców: " + ex.getMessage(),
-                    "Błąd", JOptionPane.ERROR_MESSAGE);
             }
         });
         
@@ -134,18 +130,18 @@ public class HopfieldNetworkApp extends JFrame {
         gbc.gridy = 1;
         
         gbc.gridx = 0;
-        panel.add(trenuj, gbc);
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 0.5;
         
-        gbc.gridx = 1;
+        przyciskUzupelniania.setFont(new Font("Arial", Font.BOLD, 16));
         panel.add(przyciskUzupelniania, gbc);
         
         gbc.gridx = 2;
         gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.weightx = 1.0;
+        gbc.weightx = 0.5;
         
-        przegladajWzorce.setFont(new Font("Arial", Font.BOLD, 16));
-        
+        przegladajWzorce.setFont(new Font("Arial", Font.BOLD, 14));
         panel.add(przegladajWzorce, gbc);
         
         return panel;
@@ -198,12 +194,10 @@ public class HopfieldNetworkApp extends JFrame {
             PatternUtils.zapiszWzorzec(wzorzec, litera);
             wzorce.get(litera).add(wzorzec);
             
-            JOptionPane.showMessageDialog(this, "Wzorzec " + litera + " został zapisany pomyślnie!");
             aktualizujStatystyki();
+            trenujSiec();
         } catch (IOException ex) {
-            JOptionPane.showMessageDialog(this, 
-                "Błąd podczas zapisywania wzorca: " + ex.getMessage(),
-                "Błąd", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
         }
     }
     
@@ -212,173 +206,126 @@ public class HopfieldNetworkApp extends JFrame {
             wzorce = PatternUtils.wczytajWszystkieWzorce();
             aktualizujStatystyki();
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, 
-                "Błąd podczas wczytywania wzorców: " + e.getMessage(),
-                "Błąd", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
     
     private void trenujSiec() {
-        List<int[]> wzorceTreningowe = wzorce.values().stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-        
-        if (wzorceTreningowe.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Brak wzorców do treningu!");
-            return;
+        List<int[]> wzorceTreningowe = new ArrayList<>();
+        for (List<int[]> letterSamples : wzorce.values()) {
+            wzorceTreningowe.addAll(letterSamples);
         }
         
-        if (wzorceTreningowe.size() < 3) {
-            JOptionPane.showMessageDialog(this, 
-                "Zaleca się posiadanie co najmniej jednego wzorca dla każdej litery (M, O, N).",
-                "Uwaga", JOptionPane.WARNING_MESSAGE);
+        if (!wzorceTreningowe.isEmpty()) {
+            siec = new HopfieldNetwork(64);
+            siec.trenuj(wzorceTreningowe.toArray(new int[0][]));
+            siecWytrenowana = true;
+            
+            System.out.println("Wytrenowano sieć na " + wzorceTreningowe.size() + " wzorcach");
+            etykietaWyniku.setText("<html>Sieć gotowa do pracy.<br>Narysuj fragment litery</html>");
         }
-        
-        siec.trenuj(wzorceTreningowe.toArray(new int[0][]));
-        siecWytrenowana = true; 
-        aktualizujStanPrzyciskow(); 
-        
-        JOptionPane.showMessageDialog(this, 
-            "Sieć wytrenowana na " + wzorceTreningowe.size() + " wzorcach!");
     }
     
     private void uzupelnijWzorzec() {
-        if (!siecWytrenowana) {
-            JOptionPane.showMessageDialog(this, 
-                "Najpierw wytrenuj sieć przyciskiem \"Trenuj\".",
-                "Sieć niewytrenowana", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        
-        if (wzorcePuste()) {
-            JOptionPane.showMessageDialog(this, 
-                "Brak wzorców do rozpoznawania. Zapisz wzorce i wytrenuj sieć.",
-                "Brak wzorców", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        
         if (animacjaTrwa) {
             zatrzymajAnimacje();
             return;
         }
         
-        int[] biezacyWzorzec = panelSiatki.pobierzSiatkeJakoTablice();
-        if (!maAktywnePiksele(biezacyWzorzec)) {
-            JOptionPane.showMessageDialog(this, 
-                "Narysuj fragment litery przed uzupełnianiem!",
-                "Pusty wzorzec", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        
-        int[] oryginalnyWzorzec = biezacyWzorzec.clone();
+        int[] inputPattern = panelSiatki.pobierzSiatkeJakoTablice();
         panelSiatki.zapiszBiezacyWzorzec();
         
-        DopasowanieWzorca najlepszeDopasowanie = znajdzNajlepiejDopasowanyWzorzec(oryginalnyWzorzec);
-        
-        if (najlepszeDopasowanie != null) {
-            rozpocznijAnimowaneUzupelnianie(oryginalnyWzorzec, najlepszeDopasowanie);
-        } else {
-            JOptionPane.showMessageDialog(this, 
-                "Nie znaleziono pasującego wzorca.\nŻaden z zapisanych wzorców nie zawiera wszystkich narysowanych pikseli.",
-                "Brak dopasowania", JOptionPane.INFORMATION_MESSAGE);
-        }
+        rozpocznijAnimowaneRozpoznawanie(inputPattern.clone());
     }
     
-    private DopasowanieWzorca znajdzNajlepiejDopasowanyWzorzec(int[] wzorzecUzytkownika) {
-        DopasowanieWzorca najlepszeDopasowanie = null;
-        int minPikseliDoDodania = Integer.MAX_VALUE;
-        
-        for (String litera : wzorce.keySet()) {
-            for (int[] wzorzecBazowy : wzorce.get(litera)) {
-                if (wszystkiePikseleZgodne(wzorzecUzytkownika, wzorzecBazowy)) {
-                    int pikseleDoDodania = policzPikseleDoDodania(wzorzecUzytkownika, wzorzecBazowy);
-                    if (pikseleDoDodania < minPikseliDoDodania) {
-                        minPikseliDoDodania = pikseleDoDodania;
-                        najlepszeDopasowanie = new DopasowanieWzorca(litera, wzorzecBazowy, pikseleDoDodania);
-                    }
-                }
-            }
-        }
-        
-        return najlepszeDopasowanie;
-    }
-    
-    private boolean wszystkiePikseleZgodne(int[] wzorzecUzytkownika, int[] wzorzecBazowy) {
-        for (int i = 0; i < wzorzecUzytkownika.length; i++) {
-            if (wzorzecUzytkownika[i] == 1 && wzorzecBazowy[i] == -1) {
-                return false;
-            }
-        }
-        return true;
-    }
-    
-    private int policzPikseleDoDodania(int[] wzorzecUzytkownika, int[] wzorzecBazowy) {
-        int licznik = 0;
-        for (int i = 0; i < wzorzecBazowy.length; i++) {
-            if (wzorzecBazowy[i] == 1 && wzorzecUzytkownika[i] == -1) {
-                licznik++;
-            }
-        }
-        return licznik;
-    }
-    
-    private void rozpocznijAnimowaneUzupelnianie(int[] oryginalnyWzorzec, DopasowanieWzorca dopasowanie) {
+    private void rozpocznijAnimowaneRozpoznawanie(int[] poczatkowyWzorzec) {
         przyciskUzupelniania.setText("Zatrzymaj");
+        przyciskUzupelniania.setEnabled(true);
         animacjaTrwa = true;
         
-        List<Integer> pikseleDoDodania = new ArrayList<>();
-        for (int i = 0; i < oryginalnyWzorzec.length; i++) {
-            if (dopasowanie.wzorzec[i] == 1 && oryginalnyWzorzec[i] == -1) {
-                pikseleDoDodania.add(i);
-            }
-        }
+        final int[] wzorzecPoczatkowy = poczatkowyWzorzec.clone();
         
-        Collections.shuffle(pikseleDoDodania);
+        List<int[]> krokaAnimacji = siec.rozpoznajZKrokami(wzorzecPoczatkowy.clone(), MAX_ITERACJI_HOPFIELD);
         
-        final int[] aktualnyWzorzec = oryginalnyWzorzec.clone();
+        System.out.println("Початок анімації, кількість кроків: " + krokaAnimacji.size());
+        etykietaWyniku.setText("<html><div style='width:380px'>" +
+                "<b>Анімація мережі Хопфілда...</b><br>" +
+                "Крок: 0/" + krokaAnimacji.size() + "</div></html>");
         
-        etykietaWyniku.setText(String.format("<html><div style='width:380px'><b>Uzupełnianie wzorca litery %s...</b><br>" +
-                "Pozostałe piksele: %d</div></html>", dopasowanie.litera, pikseleDoDodania.size()));
+        OPOZNIENIE_ANIMACJI = 300;
         
-        czasomierzAnimacji = new Timer(OPOZNIENIE_ANIMACJI, new AnimatorUzupelnianiaWzorca(
-                aktualnyWzorzec, oryginalnyWzorzec, pikseleDoDodania, dopasowanie.litera));
-        
+        czasomierzAnimacji = new Timer(OPOZNIENIE_ANIMACJI, 
+                new AnimatorRozpoznawaniaHopfield(wzorzecPoczatkowy, krokaAnimacji));
         czasomierzAnimacji.start();
     }
     
-    private class AnimatorUzupelnianiaWzorca implements ActionListener {
-        private final int[] aktualnyWzorzec;
-        private final int[] oryginalnyWzorzec;
-        private final List<Integer> pikseleDoDodania;
-        private final String litera;
-        private int indeksPiksela = 0;
+    private class AnimatorRozpoznawaniaHopfield implements ActionListener {
+        private final int[] poczatkowyWzorzec;
+        private final List<int[]> stanyPosrednie;
+        private int indeksStanu = 0;
         
-        public AnimatorUzupelnianiaWzorca(int[] aktualnyWzorzec, int[] oryginalnyWzorzec, 
-                                      List<Integer> pikseleDoDodania, String litera) {
-            this.aktualnyWzorzec = aktualnyWzorzec;
-            this.oryginalnyWzorzec = oryginalnyWzorzec;
-            this.pikseleDoDodania = pikseleDoDodania;
-            this.litera = litera;
+        public AnimatorRozpoznawaniaHopfield(int[] poczatkowyWzorzec, List<int[]> stanyPosrednie) {
+            this.poczatkowyWzorzec = poczatkowyWzorzec;
+            this.stanyPosrednie = stanyPosrednie;
         }
         
         @Override
         public void actionPerformed(ActionEvent e) {
-            if (indeksPiksela >= pikseleDoDodania.size()) {
+            if (indeksStanu >= stanyPosrednie.size()) {
                 zatrzymajAnimacje();
-                zakonczUzupelnianie(aktualnyWzorzec, oryginalnyWzorzec, litera);
+                zakonczRozpoznawanie();
+                przyciskUzupelniania.setEnabled(true);
                 return;
             }
             
-            int pikselDoZmiany = pikseleDoDodania.get(indeksPiksela++);
-            aktualnyWzorzec[pikselDoZmiany] = 1;
+            int[] biezacyStan = stanyPosrednie.get(indeksStanu);
+            panelSiatki.ustawSiatkeZTablicy(biezacyStan);
             
-            panelSiatki.ustawSiatkeZTablicy(aktualnyWzorzec);
+            etykietaWyniku.setText(String.format("<html><div style='width:380px'>" +
+                    "<b>Przetwarzanie sieci Hopfielda</b><br>" +
+                    "Iteracja: %d/%d<br>" +
+                    "Energia sieci: %.2f</div></html>", 
+                    indeksStanu + 1, stanyPosrednie.size(), 
+                    siec.obliczEnergie(biezacyStan)));
             
-            int pozostalo = pikseleDoDodania.size() - indeksPiksela;
-            etykietaWyniku.setText(String.format("<html><div style='width:380px'><b>Uzupełnianie wzorca litery %s...</b><br>" +
-                    "Pozostałe piksele: %d<br>" +
-                    "Dodano piksel w: (%d,%d)</div></html>", 
-                    litera, pozostalo, pikselDoZmiany / 8, pikselDoZmiany % 8));
+            indeksStanu++;
+        }
+        
+        private void zakonczRozpoznawanie() {
+            StringBuilder tekstWyniku = new StringBuilder("<html><div style='width:380px'>");
+            tekstWyniku.append("<h3>WYNIK SIECI HOPFIELDA</h3>");
+            
+            String najblizszaLitera = znajdzNajblizszaLitere(stanyPosrednie.get(stanyPosrednie.size() - 1));
+            if (najblizszaLitera != null) {
+                tekstWyniku.append("Najbliższa litera: <b style='font-size:18px;'>")
+                          .append(najblizszaLitera).append("</b><br><br>");
+            }
+            
+            tekstWyniku.append("Liczba iteracji: ").append(stanyPosrednie.size()).append("<br>");
+            tekstWyniku.append("Energia końcowa: ")
+                     .append(String.format("%.2f", siec.obliczEnergie(stanyPosrednie.get(stanyPosrednie.size() - 1))))
+                     .append("<br><br>");
+            tekstWyniku.append("<span style='color:green;'><b>Przetwarzanie zakończone!</b></span>");
+            tekstWyniku.append("</div></html>");
+            
+            etykietaWyniku.setText(tekstWyniku.toString());
+        }
+        
+        private String znajdzNajblizszaLitere(int[] wzorzec) {
+            String najblizszaLitera = null;
+            int najmniejszaOdleglosc = Integer.MAX_VALUE;
+            
+            for (Map.Entry<String, List<int[]>> entry : wzorce.entrySet()) {
+                for (int[] wzorzecTreningowy : entry.getValue()) {
+                    int odleglosc = siec.odlegloscHamminga(wzorzec, wzorzecTreningowy);
+                    if (odleglosc < najmniejszaOdleglosc) {
+                        najmniejszaOdleglosc = odleglosc;
+                        najblizszaLitera = entry.getKey();
+                    }
+                }
+            }
+            
+            return najblizszaLitera;
         }
     }
     
@@ -388,36 +335,7 @@ public class HopfieldNetworkApp extends JFrame {
         }
         animacjaTrwa = false;
         przyciskUzupelniania.setText("Uzupełnij");
-    }
-    
-    private void zakonczUzupelnianie(int[] finalnyWzorzec, int[] oryginalnyWzorzec, String rozpoznanaLitera) {
-        for (int i = 0; i < finalnyWzorzec.length; i++) {
-            if (oryginalnyWzorzec[i] == 1) {
-                finalnyWzorzec[i] = 1;
-            }
-        }
-        
-        panelSiatki.ustawSiatkeZTablicy(finalnyWzorzec);
-        
-        StringBuilder tekstWyniku = new StringBuilder("<html><div style='width:380px'>");
-        tekstWyniku.append("<h3>WYNIK DOPASOWANIA WZORCA</h3>");
-        tekstWyniku.append("Rozpoznana litera: <b style='font-size:18px;'>").append(rozpoznanaLitera).append("</b><br><br>");
-        tekstWyniku.append("Wzorzec został uzupełniony na podstawie dokładnego dopasowania.<br><br>");
-        tekstWyniku.append("<span style='color:green;'><b>Uzupełnianie zakończone!</b></span>");
-        tekstWyniku.append("</div></html>");
-        
-        etykietaWyniku.setText(tekstWyniku.toString());
-    }
-    
-    private boolean wzorcePuste() {
-        return wzorce.values().stream().anyMatch(List::isEmpty);
-    }
-    
-    private boolean maAktywnePiksele(int[] wzorzec) {
-        for (int piksel : wzorzec) {
-            if (piksel == 1) return true;
-        }
-        return false;
+        przyciskUzupelniania.setEnabled(true);
     }
     
     private void aktualizujStatystyki() {
@@ -434,25 +352,12 @@ public class HopfieldNetworkApp extends JFrame {
     }
     
     private void aktualizujStanPrzyciskow() {
-        przyciskUzupelniania.setEnabled(siecWytrenowana && !wzorcePuste());
+        przyciskUzupelniania.setEnabled(true);
         
         if (!siecWytrenowana) {
-            etykietaWyniku.setText("<html>Aby rozpocząć rozpoznawanie wzorców:<br>" +
-                "1. Zapisz kilka wzorców liter<br>" +
-                "2. Kliknij przycisk \"Trenuj\"<br>" +
-                "3. Narysuj fragment litery i kliknij \"Uzupełnij\"</html>");
-        }
-    }
-    
-    private static class DopasowanieWzorca {
-        final String litera;
-        final int[] wzorzec;
-        final int pikseleDoDodania;
-        
-        DopasowanieWzorca(String litera, int[] wzorzec, int pikseleDoDodania) {
-            this.litera = litera;
-            this.wzorzec = wzorzec;
-            this.pikseleDoDodania = pikseleDoDodania;
+            etykietaWyniku.setText("<html>Sieć uczy się automatycznie przy uruchomieniu programu " +
+                "i po dodaniu nowych wzorców.<br>" +
+                "Narysuj kształt i naciśnij 'Uzupełnij', aby uruchomić sieć Hopfielda</html>");
         }
     }
     

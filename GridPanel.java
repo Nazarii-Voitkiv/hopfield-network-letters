@@ -5,6 +5,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import javax.swing.border.LineBorder;
 import javax.swing.plaf.basic.BasicButtonUI;
+import java.util.List;
 
 public class GridPanel extends JPanel {
     private static final int ROZMIAR_SIATKI = 8;
@@ -48,7 +49,6 @@ public class GridPanel extends JPanel {
             }
         }
     }
-    
     private JButton utworzPrzyciskSiatki(int wiersz, int kolumna) {
         JButton przycisk = new JButton();
         
@@ -126,7 +126,7 @@ public class GridPanel extends JPanel {
         
         @Override
         public void mouseMoved(MouseEvent e) {
-            // Nic nie robimy przy poruszaniu myszą bez wciśniętego przycisku
+            
         }
     }
     

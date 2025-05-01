@@ -1,3 +1,9 @@
+import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 public class HopfieldNetwork {
     private final int rozmiar;
     private final double[][] wagi;
@@ -13,10 +19,19 @@ public class HopfieldNetwork {
         }
         
         zresetujWagi();
-        zastosujReguleHebbianowska(wzorce);
+        
+        for (int[] wzorzec : wzorce) {
+            for (int i = 0; i < rozmiar; i++) {
+                for (int j = 0; j < rozmiar; j++) {
+                    if (i != j) {
+                        wagi[i][j] += (double) wzorzec[i] * wzorzec[j] / rozmiar;
+                    }
+                }
+            }
+        }
     }
     
-    private void zresetujWagi() {
+    public void zresetujWagi() {
         for (int i = 0; i < rozmiar; i++) {
             for (int j = 0; j < rozmiar; j++) {
                 wagi[i][j] = 0.0;
@@ -24,38 +39,22 @@ public class HopfieldNetwork {
         }
     }
     
-    private void zastosujReguleHebbianowska(int[][] wzorce) {
-        for (int[] wzorzec : wzorce) {
-            for (int i = 0; i < rozmiar; i++) {
-                for (int j = 0; j < rozmiar; j++) {
-                    if (i != j) {
-                        wagi[i][j] += (double)(wzorzec[i] * wzorzec[j]) / wzorce.length;
-                    }
-                }
-            }
-        }
-    }
-    
-    public int[] rozpoznaj(int[] wejscie) {
-        return rozpoznaj(wejscie, 20);
-    }
-    
     public int[] rozpoznaj(int[] wejscie, int maksIteracji) {
+        if (wejscie.length != rozmiar) {
+            throw new IllegalArgumentException("Wymiar wejścia musi być zgodny z rozmiarem sieci");
+        }
+        
         int[] stan = wejscie.clone();
         boolean zmieniono;
         int iteracje = 0;
-        double poprzedniaEnergia = obliczEnergie(stan);
         
         while (iteracje < maksIteracji) {
             zmieniono = aktualizujStanSieci(stan);
             
-            double aktualna_energia = obliczEnergie(stan);
-            
-            if (!zmieniono || aktualna_energia >= poprzedniaEnergia) {
+            if (!zmieniono) {
                 break;
             }
             
-            poprzedniaEnergia = aktualna_energia;
             iteracje++;
         }
         
@@ -64,32 +63,38 @@ public class HopfieldNetwork {
     
     private boolean aktualizujStanSieci(int[] stan) {
         boolean zmieniono = false;
+        int[] nowyStan = new int[stan.length];
         
         for (int i = 0; i < rozmiar; i++) {
             double aktywacja = obliczAktywacje(stan, i);
-            int nowaWartosc = (aktywacja > 0.0) ? 1 : -1;
+            nowyStan[i] = (aktywacja >= 0) ? 1 : -1;
             
-            if (stan[i] != nowaWartosc) {
-                stan[i] = nowaWartosc;
+            if (stan[i] != nowyStan[i]) {
                 zmieniono = true;
             }
         }
         
+        System.arraycopy(nowyStan, 0, stan, 0, stan.length);
         return zmieniono;
     }
     
-    public int odlegloscHamminga(int[] a, int[] b) {
-        if (a.length != b.length) {
-            throw new IllegalArgumentException("Wektory muszą mieć tę samą długość");
+    public double obliczAktywacje(int[] stan, int indeks) {
+        double aktywacja = 0.0;
+        for (int j = 0; j < rozmiar; j++) {
+            if (j != indeks) {
+                aktywacja += wagi[indeks][j] * stan[j];
+            }
         }
-        
+        return aktywacja;
+    }
+    
+    public int odlegloscHamminga(int[] a, int[] b) {
         int odleglosc = 0;
         for (int i = 0; i < a.length; i++) {
             if (a[i] != b[i]) {
                 odleglosc++;
             }
         }
-        
         return odleglosc;
     }
     
@@ -107,48 +112,30 @@ public class HopfieldNetwork {
         return energia;
     }
     
-    public boolean aktualizujNeuron(int[] stan, int indeks, int[] oryginalneWejscie) {
-        sprawdzIndeks(indeks);
-        
-        if (oryginalneWejscie[indeks] == 1) {
-            return false;
+    public List<int[]> rozpoznajZKrokami(int[] wejscie, int maksIteracji) {
+        if (wejscie.length != rozmiar) {
+            throw new IllegalArgumentException("Wymiar wejścia musi być zgodny z rozmiarem sieci");
         }
         
-        double aktywacja = obliczAktywacje(stan, indeks);
-        int poprzedniStan = stan[indeks];
-        stan[indeks] = (aktywacja > 0.0) ? 1 : -1;
+        List<int[]> stany = new ArrayList<>();
+        int[] stan = wejscie.clone();
         
-        return stan[indeks] != poprzedniStan;
-    }
-    
-    private void sprawdzIndeks(int indeks) {
-        if (indeks < 0 || indeks >= rozmiar) {
-            throw new IllegalArgumentException("Indeks poza zakresem: " + indeks);
-        }
-    }
-    
-    public double obliczAktywacje(int[] stan, int indeks) {
-        sprawdzIndeks(indeks);
+        stany.add(stan.clone());
         
-        return java.util.stream.IntStream.range(0, rozmiar)
-            .filter(j -> j != indeks)
-            .mapToDouble(j -> wagi[indeks][j] * stan[j])
-            .sum();
-    }
-    
-    public boolean czyStan_stabilny(int[] stan, int[] oryginalneWejscie) {
-        for (int i = 0; i < rozmiar; i++) {
-            if (oryginalneWejscie[i] == 1) {
-                continue;
+        boolean zmieniono;
+        int iteracje = 0;
+        
+        while (iteracje < maksIteracji) {
+            zmieniono = aktualizujStanSieci(stan);
+            stany.add(stan.clone());
+            
+            if (!zmieniono) {
+                break;
             }
             
-            double aktywacja = obliczAktywacje(stan, i);
-            int nowaWartosc = (aktywacja > 0.0) ? 1 : -1;
-            
-            if (stan[i] != nowaWartosc) {
-                return false;
-            }
+            iteracje++;
         }
-        return true;
+        
+        return stany;
     }
 }

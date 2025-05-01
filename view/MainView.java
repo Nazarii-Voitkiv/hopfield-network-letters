@@ -35,7 +35,7 @@ public class MainView extends JFrame {
         
         createInterface();
         
-        setSize(500, 800);
+        setSize(500, 900);
         setResizable(false);
         setLocationRelativeTo(null);
         
@@ -118,14 +118,13 @@ public class MainView extends JFrame {
     private JPanel createInfoPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        panel.setPreferredSize(new Dimension(400, 150));
+        panel.setPreferredSize(new Dimension(800, 250));
         
-        JScrollPane scrollPane = new JScrollPane(resultLabel);
-        scrollPane.setBorder(null);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.add(resultLabel, BorderLayout.CENTER);
         
         JPanel labelPanel = new JPanel(new BorderLayout());
-        labelPanel.add(scrollPane, BorderLayout.CENTER);
+        labelPanel.add(contentPanel, BorderLayout.CENTER);
         labelPanel.add(statsLabel, BorderLayout.SOUTH);
         
         panel.add(labelPanel, BorderLayout.CENTER);
